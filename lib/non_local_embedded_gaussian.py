@@ -43,6 +43,7 @@ class _NonLocalBlockND(nn.Module):
                 bn(self.in_channels)
             )
             nn.init.constant_(self.W[1].weight, 0)
+            #nn.init.constant_(tensor,val)用val值初始化tensor  W[1]
             nn.init.constant_(self.W[1].bias, 0)
         else:
             self.W = conv_nd(in_channels=self.inter_channels, out_channels=self.in_channels,
@@ -62,22 +63,28 @@ class _NonLocalBlockND(nn.Module):
     def forward(self, x):
         '''
         :param x: (b, c, t, h, w)
+        (batch,channel,time,height,weight)
         :return:
         '''
 
         batch_size = x.size(0)
 
         g_x = self.g(x).view(batch_size, self.inter_channels, -1)
+        #view() 相当于resize
         g_x = g_x.permute(0, 2, 1)
+        #permute() 维度转化 将(b,c,thw)转化为(b,thw,c)
 
         theta_x = self.theta(x).view(batch_size, self.inter_channels, -1)
         theta_x = theta_x.permute(0, 2, 1)
         phi_x = self.phi(x).view(batch_size, self.inter_channels, -1)
         f = torch.matmul(theta_x, phi_x)
+        #matmul()一维是点乘 二维为矩阵乘法
+        #多维 最后两维矩阵乘法 其他维不变
         f_div_C = F.softmax(f, dim=-1)
 
         y = torch.matmul(f_div_C, g_x)
         y = y.permute(0, 2, 1).contiguous()
+        #contiguous() 返回连续tensor
         y = y.view(batch_size, self.inter_channels, *x.size()[2:])
         W_y = self.W(y)
         z = W_y + x
